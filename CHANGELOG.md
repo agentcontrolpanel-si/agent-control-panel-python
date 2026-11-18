@@ -4,6 +4,15 @@ All notable changes to the Python SDK. Versions stay `0.x` until the wire contra
 customers; after the first public release, contract changes are additive only (clients live inside customer
 apps). The wire contract is the same as the Node SDK (`agent-control-panel` on npm).
 
+## 0.2.0 (2026-11-18)
+
+Agent anatomy. New `manifest=` option on `create_client` (and `AcpClient.set_manifest()`): the agent's framework,
+primary and fallback models, tools (name and one-line description) and memory (type and store). Sent on the first
+heartbeat and again only after `set_manifest()`, and shown on the agent's page in ACP. Additive: without a
+manifest nothing changes, and older ACP servers ignore it. Names and descriptions only, never secrets or tool
+arguments; ACP ignores a manifest over 16 KB. The heartbeat's `*_since_last` counters are still sent; ACP ignores
+them since 2026-11-18 and counts runs from reports only.
+
 ## 0.1.4 (2026-11-11)
 
 Agent framework results are read as they are; no adapter code. `wrap_agent_run(lambda: ...)` now records the

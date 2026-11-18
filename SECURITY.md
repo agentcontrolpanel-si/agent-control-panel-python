@@ -7,7 +7,7 @@ This SDK runs inside production applications, so we treat vulnerabilities in it 
 Please **do not open a public issue**. Report privately through either:
 
 - GitHub: **Security → Report a vulnerability** on this repository (private advisory), or
-- Email: founders@agentcontrolpanel.si
+- Email: security@agentcontrolpanel.si
 
 Include the affected version, a description, and steps to reproduce. We acknowledge reports within 3 business
 days and keep you updated until a fix ships. Our responsible disclosure policy, including safe harbor, is at

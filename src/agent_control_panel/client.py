@@ -52,6 +52,7 @@ class AcpClient(Background):
         capture_content: bool = True,
         startup_wait_seconds: float = 3.0,
         transport: Transport | None = None,
+        manifest: Mapping[str, Any] | None = None,
     ) -> None:
         if not url:
             raise ValueError("create_client: url is required")
@@ -80,6 +81,11 @@ class AcpClient(Background):
         self.capture_content = capture_content
         self._startup_wait_seconds = startup_wait_seconds
         self._log = logger or logging.getLogger("agent_control_panel")
+        # Agent anatomy (framework, models, tools, memory), sent on the next heartbeat after it is set.
+        self._manifest: dict[str, Any] | None = None
+        self._manifest_pending = False
+        if manifest is not None:
+            self.set_manifest(manifest)
         super().__init__(heartbeat_seconds, flush_seconds)
         self._api = Api(
             self.url,
@@ -140,6 +146,16 @@ class AcpClient(Background):
         self._first_heartbeat.wait(self._startup_wait_seconds)
         self._startup_wait_pending = False
 
+    def set_manifest(self, manifest: Mapping[str, Any]) -> None:
+        """Replace the agent manifest shown on the agent's page in ACP; sent with the next heartbeat only.
+
+        Keys: ``framework`` (str), ``models`` ({"primary": str, "fallbacks": [str]}), ``tools``
+        ([{"name": str, "description": str}]), ``memory`` ({"type": "none"|"short_term"|"long_term"|"both",
+        "store": str}). Names and one-line descriptions only: never secrets, tool arguments or user data.
+        """
+        self._manifest = dict(manifest)
+        self._manifest_pending = True
+
     def _heartbeat(self) -> None:
         try:
             snap = self._control.heartbeat_snapshot()
@@ -155,9 +171,15 @@ class AcpClient(Background):
             if snap.model:
                 # The model override in effect, so ACP can confirm a model swap.
                 entry["model"] = snap.model
+            manifest = self._manifest if self._manifest_pending else None
+            if manifest is not None:
+                entry["manifest"] = manifest
             body = json.dumps({"api_key": self.api_key, "agents": [entry]}).encode()
             ok, reply = self._api.post("/api/heartbeat", body, 10.0)
             if ok:
+                # Clear only if this heartbeat carried the latest manifest (set_manifest may have run since).
+                if manifest is not None and manifest is self._manifest:
+                    self._manifest_pending = False
                 self._reporter.commit_counters(sent)
                 self._control.adopt(reply, snap.seq)
         except Exception as err:

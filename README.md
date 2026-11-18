@@ -157,7 +157,7 @@ swaps arrive with the next heartbeat (within 30 s), and prompt changes are fetch
 
 | Member | What it does |
 |---|---|
-| `create_client(...)` | `url`, `api_key`, `agent_id`, `webhook_secret` (required); `webhook_secret_prev` during rotation; `heartbeat_seconds` (30), `flush_seconds` (5), `flush_at` (50), `max_buffer` (200); `logger`; `disable_control`; `capture_content` (default `True`; `False` = metadata only); `startup_wait_seconds` (3, see `wrap_agent_run`); `allow_insecure_http` (development only); `transport` (for tests). `url` must be https (or http to localhost). Raises `ValueError` for a missing credential or an insecure URL. |
+| `create_client(...)` | `url`, `api_key`, `agent_id`, `webhook_secret` (required); `webhook_secret_prev` during rotation; `heartbeat_seconds` (30), `flush_seconds` (5), `flush_at` (50), `max_buffer` (200); `logger`; `disable_control`; `capture_content` (default `True`; `False` = metadata only); `startup_wait_seconds` (3, see `wrap_agent_run`); `manifest` (see below); `allow_insecure_http` (development only); `transport` (for tests). `url` must be https (or http to localhost). Raises `ValueError` for a missing credential or an insecure URL. |
 | `start()` / `stop(timeout=10)` | Start heartbeats and background flushing / flush everything and stop, giving up after `timeout`. The threads never keep your process alive; pending runs are flushed at interpreter exit. `with create_client(...) as acp:` does both. |
 | `wrap_agent_run(fn, *, user_input, full_input, input_summary, model_used)` | Run `fn()`, report it (with the answer text from the result), re-raise its exception unchanged. Raises `AgentPausedError` while paused or stopped. After `start()`, the first call waits up to `startup_wait_seconds` for ACP's first heartbeat reply, so a pause holds across restarts (fail-open: if ACP does not answer, the run goes ahead). |
 | `wrap_agent_run_async(fn, ...)` | The same for coroutines: `await acp.wrap_agent_run_async(lambda: client.create(...))`. |
@@ -168,6 +168,27 @@ swaps arrive with the next heartbeat (within 30 s), and prompt changes are fetch
 | `status` | `idle`, `running`, `paused` or `stopped`. |
 | `handle_webhook(headers, raw_body)` / `webhook_response(...)` | Verify and apply a signed command / the same as an HTTP status and JSON body. |
 | `apply_command(command, payload=None)` | Apply a command locally (e.g. your own kill switch). A pause set this way is never lifted by ACP. |
+| `set_manifest(manifest)` | Replace the agent manifest (since 0.2.0); sent with the next heartbeat. |
+
+### Agent manifest (since 0.2.0)
+
+Tell ACP what the agent is made of, and its page shows it: framework, primary and fallback models, tools and
+memory. It is sent on the first heartbeat and again only after `set_manifest()`.
+
+```python
+acp = create_client(
+    # url, api_key, agent_id, webhook_secret
+    manifest={
+        "framework": "langgraph",
+        "models": {"primary": "gpt-4o", "fallbacks": ["claude-sonnet-4"]},
+        "tools": [{"name": "search_orders", "description": "Find an order by id or email"}],
+        "memory": {"type": "long_term", "store": "pgvector"},  # none | short_term | long_term | both
+    },
+)
+```
+
+Names and one-line descriptions only: never secrets, tool arguments or user data. Limits: framework 40 chars,
+5 fallback models, 64 tools (name 80, description 200 chars); ACP ignores a manifest over 16 KB.
 
 ## Security
 

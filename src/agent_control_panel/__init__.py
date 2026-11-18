@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 from ._content import MAX_FULL_CHARS, extract_text
 from ._http import assert_secure_url
@@ -46,6 +47,7 @@ def create_client(
     capture_content: bool = True,
     startup_wait_seconds: float = 3.0,
     transport: Transport | None = None,
+    manifest: dict[str, Any] | None = None,
 ) -> AcpClient:
     """Create a client for one agent. Call ``start()`` (or use ``with``) for heartbeats and flushes.
 
@@ -55,6 +57,9 @@ def create_client(
     After ``start()``, the first ``wrap_agent_run`` waits up to ``startup_wait_seconds`` (default 3) for ACP's
     first heartbeat reply, so a pause or stop set in ACP holds across restarts. If ACP does not answer in time
     the run goes ahead (fail-open) and later runs never wait; 0 turns the wait off.
+
+    ``manifest`` describes the agent for its page in ACP (framework, models, tools, memory); see
+    ``AcpClient.set_manifest``.
 
     Raises ``ValueError`` for a missing credential or an insecure URL; nothing else in the client raises
     into your code except ``AgentPausedError`` from ``wrap_agent_run``.
@@ -75,6 +80,7 @@ def create_client(
         capture_content=capture_content,
         startup_wait_seconds=startup_wait_seconds,
         transport=transport,
+        manifest=manifest,
     )
 
 

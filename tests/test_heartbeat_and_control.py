@@ -332,3 +332,33 @@ def test_update_prompt_and_unknown_commands(make_client: ClientFactory) -> None:
     assert acp.apply_command("update_model") == "model now null"
     assert acp.apply_command("nonsense") is None
     assert acp.status == "idle"
+
+
+MANIFEST = {
+    "framework": "langgraph",
+    "models": {"primary": "gpt-4o", "fallbacks": ["claude-sonnet-4"]},
+    "tools": [{"name": "search_orders", "description": "Find an order"}],
+    "memory": {"type": "long_term", "store": "pgvector"},
+}
+
+
+def test_the_manifest_is_sent_once_retried_after_a_failure_and_resent_after_set_manifest(
+    make_client: ClientFactory,
+) -> None:
+    statuses = iter([503, 200, 200, 200])
+    transport = FakeTransport(lambda _req: Response(next(statuses), b"{}"))
+    acp = make_client(transport=transport, manifest=MANIFEST)
+    acp._heartbeat()  # fails: still pending
+    acp._heartbeat()  # carries it again and succeeds
+    acp._heartbeat()  # unchanged: not sent
+    acp.set_manifest({**MANIFEST, "tools": []})
+    acp._heartbeat()
+    sent = [b["agents"][0].get("manifest") for b in transport.bodies("/api/heartbeat")]
+    assert sent == [MANIFEST, MANIFEST, None, {**MANIFEST, "tools": []}]
+
+
+def test_no_manifest_key_without_a_manifest(make_client: ClientFactory) -> None:
+    transport = FakeTransport()
+    acp = make_client(transport=transport)
+    acp._heartbeat()
+    assert "manifest" not in transport.bodies("/api/heartbeat")[0]["agents"][0]
